@@ -1,0 +1,722 @@
+<title>지뢰찾기</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+  :root {
+    --chrome: #c0c0c0;
+    --chrome-light: #ffffff;
+    --chrome-dark: #7b7b7b;
+    --chrome-darker: #545454;
+    --cell: #bdbdbd;
+    --cell-open: #d6d6d6;
+    --led-bg: #1a0000;
+    --led: #ff3b30;
+    --led-dim: #4a1512;
+    --page-bg: #e7e9ee;
+    --page-bg2: #cfd4dd;
+    --ink: #1c1f26;
+    --muted: #5a6070;
+    --accent: #c0392b;
+    --panel-face: #ffffff;
+    --panel-line: #d3d7df;
+    --n1:#0000ff; --n2:#008000; --n3:#ff0000; --n4:#000080;
+    --n5:#800000; --n6:#008080; --n7:#000000; --n8:#808080;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page-bg: #14161c;
+      --page-bg2: #0d0f14;
+      --ink: #e8eaf0;
+      --muted: #99a0b2;
+      --panel-face: #1c1f28;
+      --panel-line: #2b2f3b;
+    }
+  }
+  :root[data-theme="light"] {
+    --page-bg: #e7e9ee; --page-bg2: #cfd4dd; --ink: #1c1f26; --muted: #5a6070;
+    --panel-face: #ffffff; --panel-line: #d3d7df;
+  }
+  :root[data-theme="dark"] {
+    --page-bg: #14161c; --page-bg2: #0d0f14; --ink: #e8eaf0; --muted: #99a0b2;
+    --panel-face: #1c1f28; --panel-line: #2b2f3b;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, "Apple SD Gothic Neo",
+                 "Malgun Gothic", sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 700px at 50% -10%, var(--page-bg), var(--page-bg2));
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 28px 14px 40px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .brand {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .brand h1 {
+    margin: 0;
+    font-size: clamp(22px, 5vw, 30px);
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-wrap: balance;
+  }
+  .brand h1 .mine { color: var(--accent); }
+  .brand p {
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  /* ── Classic beveled chrome console ── */
+  .console {
+    background: var(--chrome);
+    padding: 10px;
+    border-top: 3px solid var(--chrome-light);
+    border-left: 3px solid var(--chrome-light);
+    border-right: 3px solid var(--chrome-darker);
+    border-bottom: 3px solid var(--chrome-darker);
+    box-shadow: 0 18px 40px -18px rgba(0,0,0,.55);
+    max-width: 96vw;
+  }
+  .bezel-in {
+    border-top: 3px solid var(--chrome-dark);
+    border-left: 3px solid var(--chrome-dark);
+    border-right: 3px solid var(--chrome-light);
+    border-bottom: 3px solid var(--chrome-light);
+    padding: 10px;
+  }
+
+  .hud {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 8px;
+    margin-bottom: 10px;
+    border-top: 3px solid var(--chrome-dark);
+    border-left: 3px solid var(--chrome-dark);
+    border-right: 3px solid var(--chrome-light);
+    border-bottom: 3px solid var(--chrome-light);
+    background: var(--chrome);
+  }
+  .led {
+    font-family: "Consolas", "SFMono-Regular", ui-monospace, monospace;
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: 3px;
+    color: var(--led);
+    background: var(--led-bg);
+    padding: 3px 10px 4px;
+    min-width: 74px;
+    text-align: right;
+    border: 2px solid #000;
+    text-shadow: 0 0 8px rgba(255,59,48,.6);
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+  }
+  .led .off { color: var(--led-dim); text-shadow: none; }
+
+  .smiley {
+    width: 46px; height: 46px;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    background: var(--chrome);
+    border-top: 3px solid var(--chrome-light);
+    border-left: 3px solid var(--chrome-light);
+    border-right: 3px solid var(--chrome-darker);
+    border-bottom: 3px solid var(--chrome-darker);
+    display: grid; place-items: center;
+    padding: 0;
+    transition: transform .05s;
+  }
+  .smiley:active {
+    border-color: var(--chrome-dark) var(--chrome-light) var(--chrome-light) var(--chrome-dark);
+  }
+
+  /* ── Grid ── */
+  .board-wrap {
+    overflow: auto;
+    max-width: 88vw;
+    border-top: 3px solid var(--chrome-dark);
+    border-left: 3px solid var(--chrome-dark);
+    border-right: 3px solid var(--chrome-light);
+    border-bottom: 3px solid var(--chrome-light);
+  }
+  .board {
+    display: grid;
+    background: var(--chrome-dark);
+    gap: 0;
+    touch-action: manipulation;
+    width: max-content;
+  }
+  .cell {
+    width: 30px; height: 30px;
+    display: grid; place-items: center;
+    font-size: 17px;
+    font-weight: 800;
+    cursor: pointer;
+    user-select: none;
+    background: var(--cell);
+    border-top: 3px solid var(--chrome-light);
+    border-left: 3px solid var(--chrome-light);
+    border-right: 3px solid var(--chrome-dark);
+    border-bottom: 3px solid var(--chrome-dark);
+    line-height: 1;
+  }
+  .cell.open {
+    background: var(--cell-open);
+    border: 1px solid #9a9a9a;
+  }
+  .cell.mine { background: #e74c3c; }
+  .cell.flag { color: var(--accent); }
+  .cell.n1{color:var(--n1)} .cell.n2{color:var(--n2)} .cell.n3{color:var(--n3)}
+  .cell.n4{color:var(--n4)} .cell.n5{color:var(--n5)} .cell.n6{color:var(--n6)}
+  .cell.n7{color:var(--n7)} .cell.n8{color:var(--n8)}
+
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .btn {
+    font: inherit;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--panel-face);
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    padding: 9px 16px;
+    cursor: pointer;
+    transition: border-color .15s, transform .05s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .hint {
+    font-size: 12.5px;
+    color: var(--muted);
+    text-align: center;
+    max-width: 460px;
+    line-height: 1.6;
+  }
+  .hint kbd {
+    font-family: inherit;
+    background: var(--panel-face);
+    border: 1px solid var(--panel-line);
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* ── Settings modal ── */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(10,12,18,.55);
+    backdrop-filter: blur(3px);
+    display: grid; place-items: center;
+    padding: 16px;
+    z-index: 50;
+  }
+  .overlay[hidden] { display: none; }
+  .dialog {
+    width: min(400px, 94vw);
+    background: var(--panel-face);
+    border: 1px solid var(--panel-line);
+    border-radius: 16px;
+    box-shadow: 0 30px 70px -25px rgba(0,0,0,.6);
+    padding: 24px 24px 22px;
+    animation: pop .18s ease-out;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+  @media (prefers-reduced-motion: reduce) {
+    .dialog { animation: none; }
+  }
+  .dialog h2 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: .5px;
+  }
+  .dialog .sub { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+
+  .field { margin-bottom: 15px; }
+  .field label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13px; font-weight: 600; margin-bottom: 6px;
+  }
+  .field label .sfx { color: var(--muted); font-weight: 500; }
+  .stepper {
+    display: flex; align-items: stretch;
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .stepper button {
+    width: 42px; border: 0; cursor: pointer;
+    background: transparent; color: var(--ink);
+    font-size: 20px; font-weight: 700;
+  }
+  .stepper button:hover { background: rgba(192,57,43,.12); color: var(--accent); }
+  .stepper input {
+    flex: 1; min-width: 0; text-align: center;
+    border: 0; border-left: 1px solid var(--panel-line);
+    border-right: 1px solid var(--panel-line);
+    background: transparent; color: var(--ink);
+    font: inherit; font-weight: 700; font-size: 16px;
+    -moz-appearance: textfield;
+  }
+  .stepper input::-webkit-outer-spin-button,
+  .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .stepper input:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .presets { display: flex; gap: 8px; margin-bottom: 16px; }
+  .preset {
+    flex: 1; font: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 8px 4px; cursor: pointer;
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--panel-line); border-radius: 9px;
+    transition: all .15s;
+  }
+  .preset:hover, .preset.active {
+    color: var(--accent); border-color: var(--accent);
+    background: rgba(192,57,43,.07);
+  }
+  .density {
+    font-size: 12.5px; color: var(--muted);
+    text-align: center; margin: 2px 0 16px;
+  }
+  .density b { color: var(--ink); }
+  .density.warn b { color: var(--accent); }
+  .dialog .go { width: 100%; padding: 12px; font-size: 15px; }
+
+  .win-banner {
+    text-align: center; font-weight: 700; font-size: 15px;
+    min-height: 20px; letter-spacing: .3px;
+  }
+  .win-banner.win { color: #1f9d55; }
+  .win-banner.lose { color: var(--accent); }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="brand">
+  <h1>지뢰<span class="mine">찾기</span></h1>
+  <p>Minesweeper</p>
+</div>
+
+<div class="console" id="console" hidden>
+  <div class="bezel-in">
+    <div class="hud">
+      <div class="led" id="mineCounter">000</div>
+      <button class="smiley" id="smiley" title="새 게임 (F2)">🙂</button>
+      <div class="led" id="timer">000</div>
+    </div>
+    <div class="board-wrap">
+      <div class="board" id="board"></div>
+    </div>
+  </div>
+</div>
+
+<div class="win-banner" id="banner"></div>
+
+<div class="toolbar" id="toolbar" hidden>
+  <button class="btn primary" id="newGameBtn">🙂 새 게임</button>
+  <button class="btn" id="settingsBtn">⚙ 설정 변경</button>
+</div>
+
+<p class="hint" id="hint" hidden>
+  <b>좌클릭</b> 열기 · <b>우클릭</b> 깃발 · 열린 숫자를 <b>클릭</b>하면 주변 자동 열기 ·
+  모바일은 <b>길게 눌러</b> 깃발 · <kbd>F2</kbd> 새 게임<br>
+  첫 클릭은 항상 안전합니다.
+</p>
+
+<!-- ── Settings dialog (shown first) ── -->
+<div class="overlay" id="overlay">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <h2 id="dlgTitle">게임판 설정</h2>
+    <p class="sub">게임판의 가로·세로 크기와 지뢰 개수를 정하세요.</p>
+
+    <div class="presets" id="presets">
+      <button class="preset" data-c="9"  data-r="9"  data-m="10">초급 9×9</button>
+      <button class="preset" data-c="16" data-r="16" data-m="40">중급 16×16</button>
+      <button class="preset" data-c="30" data-r="16" data-m="99">고급 30×16</button>
+    </div>
+
+    <div class="field">
+      <label for="wIn">가로 (열) <span class="sfx">5 – 40</span></label>
+      <div class="stepper">
+        <button type="button" data-step="-1" data-t="w">−</button>
+        <input id="wIn" type="number" value="10" min="5" max="40" inputmode="numeric">
+        <button type="button" data-step="1" data-t="w">+</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="hIn">세로 (행) <span class="sfx">5 – 30</span></label>
+      <div class="stepper">
+        <button type="button" data-step="-1" data-t="h">−</button>
+        <input id="hIn" type="number" value="10" min="5" max="30" inputmode="numeric">
+        <button type="button" data-step="1" data-t="h">+</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="mIn">지뢰 개수 <span class="sfx" id="mMax"></span></label>
+      <div class="stepper">
+        <button type="button" data-step="-1" data-t="m">−</button>
+        <input id="mIn" type="number" value="15" min="1" inputmode="numeric">
+        <button type="button" data-step="1" data-t="m">+</button>
+      </div>
+    </div>
+
+    <p class="density" id="density"></p>
+    <button class="btn primary go" id="startBtn">게임 시작</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const overlay = $("overlay"), consoleEl = $("console"), boardEl = $("board");
+  const mineCounter = $("mineCounter"), timerEl = $("timer"), smiley = $("smiley");
+  const banner = $("banner"), toolbar = $("toolbar"), hint = $("hint");
+  const wIn = $("wIn"), hIn = $("hIn"), mIn = $("mIn");
+  const densityEl = $("density"), mMax = $("mMax");
+
+  const LIMITS = { w:[5,40], h:[5,30] };
+  const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
+
+  // ── Settings dialog logic ──
+  function readInputs() {
+    let w = clamp(parseInt(wIn.value)||5, ...LIMITS.w);
+    let h = clamp(parseInt(hIn.value)||5, ...LIMITS.h);
+    const maxMines = w*h - 1;
+    let m = clamp(parseInt(mIn.value)||1, 1, maxMines);
+    return { w, h, m, maxMines };
+  }
+  function refreshDialog() {
+    const { w, h, m, maxMines } = readInputs();
+    mMax.textContent = `1 – ${maxMines}`;
+    const cells = w*h, pct = (m/cells*100);
+    densityEl.innerHTML = `전체 <b>${cells}</b>칸 중 지뢰 <b>${m}</b>개 · 밀도 <b>${pct.toFixed(1)}%</b>`;
+    densityEl.classList.toggle("warn", pct > 35);
+    // reflect clamped values back
+    wIn.value = w; hIn.value = h; mIn.value = m; mIn.max = maxMines;
+    // preset highlight
+    document.querySelectorAll(".preset").forEach(p => {
+      p.classList.toggle("active",
+        +p.dataset.c===w && +p.dataset.r===h && +p.dataset.m===m);
+    });
+  }
+  [wIn, hIn, mIn].forEach(el => el.addEventListener("input", refreshDialog));
+
+  document.querySelectorAll(".stepper button").forEach(b => {
+    b.addEventListener("click", () => {
+      const map = { w: wIn, h: hIn, m: mIn };
+      const el = map[b.dataset.t];
+      el.value = (parseInt(el.value)||0) + (+b.dataset.step);
+      refreshDialog();
+    });
+  });
+  $("presets").addEventListener("click", e => {
+    const p = e.target.closest(".preset");
+    if (!p) return;
+    wIn.value = p.dataset.c; hIn.value = p.dataset.r; mIn.value = p.dataset.m;
+    refreshDialog();
+  });
+
+  $("startBtn").addEventListener("click", () => {
+    const { w, h, m } = readInputs();
+    overlay.hidden = true;
+    startGame(w, h, m);
+  });
+
+  function openSettings() {
+    overlay.hidden = false;
+    refreshDialog();
+    wIn.focus();
+  }
+
+  // ── Game state ──
+  let COLS, ROWS, MINES;
+  let cells;          // {mine, open, flag, adj}
+  let minesPlaced, gameOver, revealed, flags, seconds, timerId;
+
+  function startGame(w, h, m) {
+    COLS = w; ROWS = h; MINES = m;
+    resetState();
+    buildBoard();
+    consoleEl.hidden = false;
+    toolbar.hidden = false;
+    hint.hidden = false;
+    banner.textContent = ""; banner.className = "win-banner";
+  }
+
+  function resetState() {
+    cells = Array.from({length: ROWS}, () =>
+      Array.from({length: COLS}, () => ({ mine:false, open:false, flag:false, adj:0 })));
+    minesPlaced = false; gameOver = false; revealed = 0; flags = 0; seconds = 0;
+    stopTimer();
+    smiley.textContent = "🙂";
+    setLed(mineCounter, MINES);
+    setLed(timerEl, 0);
+  }
+
+  function buildBoard() {
+    boardEl.style.gridTemplateColumns = `repeat(${COLS}, 30px)`;
+    boardEl.innerHTML = "";
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const d = document.createElement("div");
+        d.className = "cell";
+        d.dataset.r = r; d.dataset.c = c;
+        boardEl.appendChild(d);
+      }
+    }
+  }
+
+  function cellEl(r, c) {
+    return boardEl.children[r*COLS + c];
+  }
+
+  // ── LED counter (3-digit, leading zeros dimmed) ──
+  function setLed(el, val) {
+    val = Math.max(-99, Math.min(999, val));
+    const neg = val < 0;
+    let s = String(Math.abs(val)).padStart(3, "0");
+    if (neg) s = "-" + s.slice(1);
+    // dim the leading zeros for the classic look
+    let html = "", lead = true;
+    for (const ch of s) {
+      if (lead && ch === "0") html += `<span class="off">0</span>`;
+      else { lead = false; html += ch; }
+    }
+    if (html === "") html = `<span class="off">000</span>`;
+    el.innerHTML = html || s;
+  }
+
+  // ── Timer ──
+  function startTimer() {
+    stopTimer();
+    timerId = setInterval(() => {
+      seconds++; setLed(timerEl, seconds);
+    }, 1000);
+  }
+  function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
+
+  // ── Neighbors ──
+  function neighbors(r, c) {
+    const out = [];
+    for (let dr = -1; dr <= 1; dr++)
+      for (let dc = -1; dc <= 1; dc++) {
+        if (!dr && !dc) continue;
+        const nr = r+dr, nc = c+dc;
+        if (nr>=0 && nr<ROWS && nc>=0 && nc<COLS) out.push([nr, nc]);
+      }
+    return out;
+  }
+
+  function placeMines(safeR, safeC) {
+    const forbidden = new Set([safeR+","+safeC]);
+    neighbors(safeR, safeC).forEach(([r,c]) => forbidden.add(r+","+c));
+    const placeable = ROWS*COLS - forbidden.size;
+    const toPlace = Math.min(MINES, placeable);
+    let placed = 0;
+    while (placed < toPlace) {
+      const r = Math.floor(Math.random()*ROWS);
+      const c = Math.floor(Math.random()*COLS);
+      if (forbidden.has(r+","+c) || cells[r][c].mine) continue;
+      cells[r][c].mine = true; placed++;
+    }
+    MINES = countMines();                 // actual placed count
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+      if (cells[r][c].mine) continue;
+      cells[r][c].adj = neighbors(r,c).filter(([nr,nc])=>cells[nr][nc].mine).length;
+    }
+    minesPlaced = true;
+    startTimer();
+  }
+  function countMines() {
+    let n=0; for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) if (cells[r][c].mine) n++;
+    return n;
+  }
+
+  // ── Interactions ──
+  boardEl.addEventListener("mousedown", e => {
+    if (gameOver) return;
+    if (e.button === 0) smiley.textContent = "😮";
+  });
+  window.addEventListener("mouseup", () => {
+    if (!gameOver) smiley.textContent = "🙂";
+  });
+
+  boardEl.addEventListener("click", e => {
+    const t = e.target.closest(".cell");
+    if (!t || gameOver) return;
+    const r = +t.dataset.r, c = +t.dataset.c;
+    const cell = cells[r][c];
+    if (cell.open) { chord(r, c); }
+    else reveal(r, c);
+  });
+
+  boardEl.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    const t = e.target.closest(".cell");
+    if (!t || gameOver) return;
+    toggleFlag(+t.dataset.r, +t.dataset.c);
+  });
+
+  // Touch: long-press to flag
+  let touchTimer = null, touchMoved = false;
+  boardEl.addEventListener("touchstart", e => {
+    const t = e.target.closest(".cell");
+    if (!t || gameOver) return;
+    touchMoved = false;
+    touchTimer = setTimeout(() => {
+      touchTimer = null;
+      toggleFlag(+t.dataset.r, +t.dataset.c);
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 380);
+  }, { passive: true });
+  boardEl.addEventListener("touchmove", () => { touchMoved = true; }, { passive: true });
+  boardEl.addEventListener("touchend", e => {
+    if (touchTimer) {
+      clearTimeout(touchTimer); touchTimer = null;
+      if (touchMoved || gameOver) return;
+      const t = e.target.closest(".cell");
+      if (!t) return;
+      e.preventDefault();
+      const r = +t.dataset.r, c = +t.dataset.c;
+      if (cells[r][c].open) chord(r, c); else reveal(r, c);
+    }
+  });
+
+  function toggleFlag(r, c) {
+    const cell = cells[r][c];
+    if (cell.open) return;
+    cell.flag = !cell.flag;
+    const el = cellEl(r, c);
+    el.classList.toggle("flag", cell.flag);
+    el.textContent = cell.flag ? "🚩" : "";
+    flags += cell.flag ? 1 : -1;
+    setLed(mineCounter, MINES - flags);
+  }
+
+  function reveal(r, c) {
+    const cell = cells[r][c];
+    if (cell.open || cell.flag) return;
+    if (!minesPlaced) placeMines(r, c);
+    if (cell.mine) { lose(r, c); return; }
+    flood(r, c);
+    checkWin();
+  }
+
+  function flood(sr, sc) {
+    const stack = [[sr, sc]];
+    while (stack.length) {
+      const [r, c] = stack.pop();
+      const cell = cells[r][c];
+      if (cell.open || cell.flag || cell.mine) continue;
+      cell.open = true; revealed++;
+      renderOpen(r, c);
+      if (cell.adj === 0)
+        neighbors(r, c).forEach(([nr,nc]) => { if (!cells[nr][nc].open) stack.push([nr,nc]); });
+    }
+  }
+
+  function renderOpen(r, c) {
+    const cell = cells[r][c];
+    const el = cellEl(r, c);
+    el.classList.add("open");
+    if (cell.adj > 0) { el.textContent = cell.adj; el.classList.add("n"+cell.adj); }
+    else el.textContent = "";
+  }
+
+  function chord(r, c) {
+    const cell = cells[r][c];
+    if (!cell.open || cell.adj === 0) return;
+    const nb = neighbors(r, c);
+    const flagged = nb.filter(([nr,nc]) => cells[nr][nc].flag).length;
+    if (flagged !== cell.adj) return;
+    let hit = null;
+    for (const [nr,nc] of nb) {
+      const n = cells[nr][nc];
+      if (!n.open && !n.flag) {
+        if (n.mine) { hit = [nr,nc]; break; }
+        flood(nr, nc);
+      }
+    }
+    if (hit) lose(hit[0], hit[1]); else checkWin();
+  }
+
+  function lose(hr, hc) {
+    gameOver = true; stopTimer();
+    smiley.textContent = "😵";
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+      const cell = cells[r][c], el = cellEl(r,c);
+      if (cell.mine && !cell.flag) {
+        el.classList.add("open");
+        el.textContent = "💣";
+        if (r===hr && c===hc) el.classList.add("mine");
+      } else if (cell.flag && !cell.mine) {
+        el.textContent = "❌";
+      }
+    }
+    banner.textContent = "💥 지뢰를 밟았습니다! 다시 도전하세요.";
+    banner.className = "win-banner lose";
+  }
+
+  function checkWin() {
+    if (revealed >= ROWS*COLS - MINES) {
+      gameOver = true; stopTimer();
+      smiley.textContent = "😎";
+      for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+        const cell = cells[r][c];
+        if (cell.mine && !cell.flag) {
+          cell.flag = true;
+          const el = cellEl(r,c);
+          el.classList.add("flag"); el.textContent = "🚩";
+        }
+      }
+      setLed(mineCounter, 0);
+      banner.textContent = `🎉 승리! ${seconds}초 만에 클리어했습니다.`;
+      banner.className = "win-banner win";
+    }
+  }
+
+  // ── Buttons / keys ──
+  $("newGameBtn").addEventListener("click", () => startGame(COLS, ROWS, MINES));
+  smiley.addEventListener("click", () => startGame(COLS, ROWS, MINES));
+  $("settingsBtn").addEventListener("click", openSettings);
+  document.addEventListener("keydown", e => {
+    if (e.key === "F2") { e.preventDefault(); if (!overlay.hidden) return; startGame(COLS, ROWS, MINES); }
+  });
+
+  // First launch → show settings
+  openSettings();
+})();
+</script>
